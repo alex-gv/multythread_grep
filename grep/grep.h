@@ -1,0 +1,101 @@
+﻿// grep.h : включаемый файл для стандартных системных включаемых файлов
+// или включаемые файлы для конкретного проекта.
+
+#pragma once
+
+#include "lock_free_queue.h"
+#include "is_binary.h"
+
+#include <iostream>
+#include <filesystem>
+#include <vector>
+#include <thread>
+
+#include <fstream>
+#include <regex>
+
+
+
+struct Options {
+    bool ignore_binaries;
+    bool verbose_mode;
+    std::string file_mask;
+};
+
+class Grep {
+public:
+    Grep() = default;
+    ~Grep() {
+        stop();
+    }
+    void stop() {
+        is_stopping_ = true;
+    };
+	void search(const std::string& path, const std::string& query, const Options& opt) {        
+        threads_.emplace_back(&Grep::process_directory, this, path, query, opt);
+        for (int i = 0; i < std::thread::hardware_concurrency(); ++i) {
+            threads_.emplace_back(&Grep::process_files, this, query, opt);
+        }
+        threads_.emplace_back(&Grep::print, this);
+
+        for (auto& thread : threads_) {
+            thread.join();
+        }
+	}
+private:    
+    void print() {        
+        std::string text;
+        while (!is_stopping_) {
+            if (!out_queue_.pop_front(text)) continue;
+            std::cout << text << std::endl;
+        }        
+    }
+
+	void process_directory(const std::filesystem::path& path, const std::string& query, const Options& opt) {               
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+			if (entry.is_regular_file() && 
+                (opt.file_mask.empty() || std::regex_search(entry.path().filename().string(), std::regex(opt.file_mask))) 
+                ) {
+                in_queue_.push_back(entry.path().string()); 
+			}
+		}
+	}
+    void process_files(const std::string& query, const Options& opt) {
+        const std::regex pattern(query);
+        std::string file;
+        while (!is_stopping_) {
+            if (!in_queue_.pop_front(file)) continue;            
+            std::ifstream f(file.c_str());
+            if (!f.is_open()) {
+                if (opt.verbose_mode) std::cout << "can't open file:" << file << std::endl;
+                continue;
+            }
+            std::string line;
+            uint64_t line_number{1};
+            bool is_first{true};
+            while (std::getline(f, line)) {
+                if (opt.ignore_binaries && is_first && is_binary(line.c_str())) {
+                    if (opt.verbose_mode) out_queue_.push_back(file + ": is binary");
+                    break;
+                }
+                std::smatch matches;
+                std::string::const_iterator searchStart(line.cbegin());
+                while (std::regex_search(searchStart, line.cend(), matches, pattern)) {
+                    out_queue_.push_back(std::to_string(line_number) + ":" + file + ":" + 
+                        matches.prefix().str() + "\033[31m" + matches.str() + "\033[0m" + matches.suffix().str()
+                    );                    
+                    searchStart = matches.suffix().first;
+                }               
+                ++line_number; 
+                if (is_first) is_first = false;
+            }
+        }
+    }
+
+private:	
+    LockFreeQueue<std::string> in_queue_;
+    LockFreeQueue<std::string> out_queue_;
+    std::atomic<bool> is_stopping_{false};
+    std::vector<std::thread> threads_;
+};
+
