@@ -1,7 +1,4 @@
-﻿// grep.h : включаемый файл для стандартных системных включаемых файлов
-// или включаемые файлы для конкретного проекта.
-
-#pragma once
+﻿#pragma once
 
 #include "lock_free_queue.h"
 #include "is_binary.h"
@@ -17,9 +14,9 @@
 
 
 struct Options {
-    bool ignore_binaries;
-    bool verbose_mode;
-    std::string file_mask{".cpp"};
+    bool ignore_binaries{true};
+    bool verbose_mode{false};
+    std::string file_mask;
 };
 
 class Grep {
@@ -55,19 +52,25 @@ private:
         }        
     }
 
-	void process_directory(const std::filesystem::path& path, const std::string& query, const Options& opt) {               
-		for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
-            try {
-                if (entry.is_regular_file() &&
-                    (opt.file_mask.empty() || std::regex_search(entry.path().filename().string(), std::regex(opt.file_mask)))
-                    ) {
-                    in_queue_.push_back(entry.path().string());
+	void process_directory(const std::filesystem::path& path, const std::string& query, const Options& opt) {   
+        try {            
+		    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                try {
+                    if (entry.is_regular_file() &&
+                        (opt.file_mask.empty() || std::regex_search(entry.path().filename().string(), std::regex(opt.file_mask)))
+                        ) {
+                        in_queue_.push_back(entry.path().string());
+                    }
+                    if (entry.is_directory())
+                        process_directory(entry.path(), query, opt);                    
+                }
+                catch (const std::exception& ex) {
+                    if (opt.verbose_mode) std::cerr << ex.what() << std::endl;
                 }
             }
-            catch (const std::exception& ex) {
-                std::cerr << ex.what() << std::endl;
-            }
-		} 
+		} catch (const std::exception& ex) {
+            if (opt.verbose_mode) std::cerr << ex.what() << std::endl;
+        }
         is_processing_finished_ = true;
 	}
     void process_files(const std::string& query, const Options& opt) {
@@ -93,7 +96,7 @@ private:
                     std::string::const_iterator searchStart(line.cbegin());
                     while (std::regex_search(searchStart, line.cend(), matches, pattern)) {
                         out_queue_.push_back(std::to_string(line_number) + ":" + file + ":" +
-                            matches.prefix().str() + "\033[31m" + matches.str() + "\033[0m" + matches.suffix().str()
+                            matches.prefix().str() + "\033[31m" + matches.str() + "\033[0m" + matches.suffix().str() // green color for marking
                         );
                         searchStart = matches.suffix().first;
                     }
