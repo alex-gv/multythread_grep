@@ -28,7 +28,7 @@ In this case, we are losing performance on creating list nodes, but it can creat
 For optimization of search, I made the determination of file type, so that we don't search in binary data.
 
 I make unittest for lock-free queue, as the main component, with gtests.
-Also, I conducted a load test on a large number of different file systems and ensured that all cores are utilized (see the screenshot).
+Also, I conducted a load test on a large number of different file systems and ensured that all cores are utilized (see cpu_load.png).
 I tested it on Windows 11 and Ubuntu 20.04.
 
 For user convenience:
@@ -48,12 +48,9 @@ pop front O(1)
 
 BUILDING AND USING
 
-Building on Linux
+Building
 cmake -S . -B build
 cmake --build build
-
-Building on Windows
-Create Visual Studio solution from directiry and build
 
 Test running
 cd build/grep/tests && ctest
