@@ -1,22 +1,61 @@
-﻿// grep.cpp: определяет точку входа для приложения.
-//
-#include "grep.h"
+﻿#include "grep.h"
 #include <iostream>
 #include <filesystem>
 
+/*
+
+*/
+
+std::string getCmdOption(char** begin, char** end, const std::string& option)
+{
+    auto itr = std::find(begin, end, option);
+    if (itr != end && ++itr != end)    
+        return std::string(*itr);
+    return {};
+}
+
+bool cmdOptionExists(char** begin, char** end, const std::string& option)
+{
+    return std::find(begin, end, option) != end;
+}
 
 int main(int argc, char* argv[]) {
-//    if (argc < 2) {
-        //std::cerr << "Usage: " << argv[0] << " <directory>" << std::endl;
-        //return 1;
-    //}
+   Options  opt;
 
-    //std::filesystem::path directory = argv[1];    
-    //if (!std::filesystem::is_directory(directory)) {
-        //std::cerr << "Error: " << directory << " is not a directory" << std::endl;
-        //return 1;
-    //}
+   if (argc < 3) {
+       std::cerr << "Usage: grep <directory> <search query> [options]" << std::endl;
+        return 1;
+    }
+
+    std::filesystem::path directory = argv[1];    
+    if (!std::filesystem::is_directory(directory)) {
+        std::cerr << "Error: " << directory << " is not a directory" << std::endl;
+        return 1;
+    }
+
+    if (!argv[2]) {
+        std::cerr << "Usage: grep <directory> <search query> [options]" << std::endl;
+        return 1;
+    }
+
+    if (cmdOptionExists(argv, argv + argc, "--help") || cmdOptionExists(argv, argv + argc, "-h")) {
+        std::cout << "Usage: grep <directory> <search query> [options]" << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "-m regexp mask for files (*.json, *.txt, etc...)" << std::endl;
+        std::cout << "-v verbose mode" << std::endl;
+        std::cout << "-di don't ignore bunary files" << std::endl;
+    }
+    if (cmdOptionExists(argv, argv + argc, "-v")) {
+        opt.verbose_mode = true;
+    }
+    if (const auto& mask = getCmdOption(argv, argv + argc, "-m"); !mask.empty()) {
+        opt.file_mask = mask;
+    }
+    if (cmdOptionExists(argv, argv + argc, "-di")) {
+        opt.ignore_binaries = false;
+    }    
     Grep g;
-    g.search("E:\\download", "59478501", {true,false,".json"});
+    g.search(argv[1], argv[2], opt);
+    //g.search("C:\\tests", "BOOST_AUTO_TEST_CAS", opt);
 	return 0;
 }

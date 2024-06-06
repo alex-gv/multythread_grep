@@ -70,4 +70,10 @@ public:
         }
         return false;
     }
+
+    bool is_empty() {
+        Node* currentHead = head.load(std::memory_order_relaxed);
+        Node* currentNext = currentHead->next.load(std::memory_order_relaxed);        
+        return currentNext == nullptr ? true : false;
+    }
 };

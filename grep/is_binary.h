@@ -1,4 +1,10 @@
 #pragma once
+
+/*
+This detection I got from here:
+https://github.com/p-ranav/hypergrep/blob/master/include/hypergrep/is_binary.hpp
+*/
+
 #include <cstring>
 
 bool is_elf_header(const char* buffer);
